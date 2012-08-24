@@ -310,14 +310,30 @@ class AddBulkCaseForm(BaseAddCaseForm, BaseCaseForm):
             for productversion in productversions:
                 this_version_kwargs = version_kwargs.copy()
                 this_version_kwargs["productversion"] = productversion
+
+                if this_version_kwargs["name"].lower().startswith("test that ", ):
+                    this_version_kwargs["name"] = this_version_kwargs["name"][10:]
+
                 caseversion = model.CaseVersion.objects.create(
                     **this_version_kwargs)
+
                 for i, step_kwargs in enumerate(steps_data, 1):
+
+                    if step_kwargs["instruction"].lower().startswith("when "):
+                        step_kwargs["instruction"] = step_kwargs["instruction"][5:]
+
+                    if step_kwargs["instruction"].lower().startswith("and when "):
+                        step_kwargs["instruction"] = step_kwargs["instruction"][9:]
+
+                    if step_kwargs["expected"].lower().startswith("then "):
+                        step_kwargs["expected"] = step_kwargs["expected"][5:]
+
                     model.CaseStep.objects.create(
                         user=self.user,
                         caseversion=caseversion,
                         number=i,
                         **step_kwargs)
+
                 self.save_tags(caseversion)
 
             cases.append(case)
