@@ -60,6 +60,7 @@ from django_openid_auth.exceptions import (
     DjangoOpenIDException,
 )
 
+from session_csrf import anonymous_csrf
 
 next_url_re = re.compile('^/[-\w/]+$')
 
@@ -143,6 +144,7 @@ def parse_openid_response(request):
     return consumer.complete(dict(request.REQUEST.items()), current_url)
 
 
+@anonymous_csrf
 def login_begin(request, template_name='openid/login.html',
                 login_complete_view='openid-complete',
                 form_class=OpenIDLoginForm,
