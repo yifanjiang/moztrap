@@ -44,6 +44,7 @@ try:
     from django.views.decorators.csrf import csrf_exempt
 except ImportError:
     from django.contrib.csrf.middleware import csrf_exempt
+from django.db.utils import IntegrityError
 
 from openid.consumer.consumer import (
     Consumer, SUCCESS, CANCEL, FAILURE)
@@ -269,6 +270,10 @@ def login_complete(request, redirect_field_name=REDIRECT_FIELD_NAME,
             user = authenticate(openid_response=openid_response)
         except DjangoOpenIDException, e:
             return render_failure(request, e.message, exception=e)
+        except IntegrityError, e:
+            message = "Your email address may have already been registered. \
+            Plesae try to use password or Persona to login "
+            return render_failure(request, message, exception=e)
 
         if user is not None:
             if user.is_active:
