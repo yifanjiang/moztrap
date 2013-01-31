@@ -201,10 +201,31 @@ class SuiteFilterSet(filters.FilterSet):
             "creator", lookup="created_by", queryset=model.User.objects.all()),
         ]
 
+class CaseVersionBoundFilterSet(filters.BoundFilterSet):
+    """Filters on ``latest`` if not filtered by ``productversion``."""
+    def filter(self, queryset):
+        """Add a filter on latest=True if not filtered on productversion."""
+        queryset = super(CaseVersionBoundFilterSet, self).filter(queryset)
+        pv = [bf for bf in self if bf.key == "productversion"][0]
+        if not pv.values:
+            # Libreoffice hacking:
+
+            # Always showing the base version "0" instead of the latest one in
+            # case management page, this will bring less maintener confusing.
+            #
+            # This is specifically hacked for Libreoffice community QA's
+            # requirements.
+            #
+            # http://$server/manage/cases/
+
+            # queryset = queryset.filter(latest=True)
+            queryset = queryset.filter(productversion__version="0")
+        return queryset
 
 
 class CaseVersionFilterSet(filters.FilterSet):
     """FilterSet for CaseVersions."""
+    bound_class = CaseVersionBoundFilterSet
 
     filters = [
         filters.ChoicesFilter("status", choices=model.CaseVersion.STATUS),
