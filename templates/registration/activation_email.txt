@@ -1,6 +1,6 @@
 {% load humanize %}Hello,
 
-We've received a request to create an account for this email address at
+We've received a request to create a Libreoffice Moztrap account for this email address at
 {{ site.name }}.
 
 To activate this account, please visit:
@@ -12,4 +12,4 @@ activation link will expire in {{ expiration_days|apnumber }} day{{ expiration_d
 
 Thanks,
 
-- {{ site.name }}
+- Libreoffice Moztrap Team
