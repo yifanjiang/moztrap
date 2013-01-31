@@ -106,8 +106,7 @@ Copy local.sample.py to local.py and modify as needed.
 # than local-memory cache. This (or some other out-of-process cache backend) is
 # required if running MozTrap under a multi-process webserver such as
 # Apache/mod_wsgi. See http://docs.djangoproject.com/en/dev/topics/cache/ for
-# more configuration options. For faster caching, install pylibmc in place of
-# python-memcached and replace MemcachedCache with PyLibMCCache.
+# more configuration options.
 #CACHES = {
 #    "default": {
 #        "BACKEND": "django.core.cache.backends.memcached.MemcachedCache",
