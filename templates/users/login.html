@@ -1,39 +1,94 @@
 {% extends 'users/base.html' %}
 
-{% block title %}Login | {{ block.super }}{% endblock title %}
+{% block title %} Login | {{ block.super }} {% endblock title %}
 
 {% block content %}
-<section id="login" class="{% block logintype %}logintype-form{% endblock logintype %}">
-  <h2>Login</h2>
-  {% block login-content %}
-  <form method="POST" id="loginform">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    <div class="formfields">
-      {% include "forms/_field.html" with field=form.username label="Username or email" %}
-      {% include "forms/_field.html" with field=form.password %}
-      {% if form.captcha %}
-
-      <p>
-        Your account or IP address has failed too many login attempts
-        recently. In order to keep your account secure, we need to verify that
-        you're a real human, not an automated account-cracking bot. Please
-        answer the simple math question below:
-      </p>
-
-      {% include "forms/_field.html" with field=form.captcha %}
-
-      {% endif %}
-    </div>
+  <section id="login" class="{% block logintype %}logintype-form{% endblock logintype %}">
     <p class="forgot">
-      Forgot your password?
-      <a href="{% url 'auth_password_reset' %}">Reset it</a>.
-    </p>
-    <div class="form-actions">
-      <a href="{% url 'registration_register' %}">register</a> or
-      <button type="submit">login</button>
-    </div>
-  </form>
-  {% endblock %}
-</section>
+      <a href="{% url 'registration_register' %}">Register</a>
+      |
+      <a href="{% url 'auth_password_reset' %}">Reset password</a>
+    </p>  
+    {% block login-content %}
+
+      <form method="POST" id="loginform">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% include "forms/_field.html" with field=form.username label="Username / Email" %}
+          <div class="formfields">
+            <table style="border:none; margin-left:10%; padding: 0">
+              <tbody>
+                <tr>
+                  <td style="padding-bottom: 0">{% include "forms/_field.html" with field=form.password %}</td>
+                  <td style="padding-left: 0.5em"><button type="submit" style="width:64%; ">login</button></td>
+                </tr>
+                <tr>
+                </tr>
+              </tbody>
+            </table>
+            {% if form.captcha %}
+
+              <p>
+                Your account or IP address has failed too many login attempts
+                recently. In order to keep your account secure, we need to verify that
+                you're a real human, not an automated account-cracking bot. Please
+                answer the simple math question below:
+              </p>
+
+              {% include "forms/_field.html" with field=form.captcha %}
+
+            {% endif %}
+          </div>
+
+      </form>
+
+    {% endblock login-content %}
+
+
+  </section>
+  
+  <section id="openid_login" class="logintype-form">
+
+      {% csrf_token %}
+      <table style="border:none; margin-left:38%; padding: 0; width: 67%;">
+        <tbody>
+          <form name="fopenid" action="/openid/login/" method="post">
+            {% csrf_token %}
+            <tr>
+              <td style="padding-bottom: 0.2em; ">
+                {{ openid_login_form.openid_identifier }}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding-top: 0.2em; ">
+                <button type="submit" style="width:100%; background-color:orange"> OpenID Sign in </button>
+              </td>
+            </tr>
+          </form>
+
+          <tr>
+            <td style="padding-top:0.12em;">
+
+              <div class="browserid">
+                <button id="browserid" style="width:100%;"> Persona Sign in </button>
+              </div>
+              <form method="POST" action="{% url 'browserid_verify' %}" id="browserid-form">
+                {% csrf_token %}
+                <input type="hidden" name="assertion" id="id_assertion" />
+                <input type="hidden" name="next" id="id_next" value="{{ next|default:'/' }}" />
+              </form>              
+
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {% if next %}
+      <input type="hidden" name="next" value="{{ next }}" />
+      {% endif %}
+
+
+  </section>
+  
+
 {% endblock content %}

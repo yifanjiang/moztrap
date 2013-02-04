@@ -3548,17 +3548,16 @@ body.login .formfield .value, body.login .formfield .errorlist {
   margin-bottom: 0em;
 }
 
-#browserid {
-  text-indent: 110%;
-  white-space: nowrap;
-  overflow: hidden;
-  background-image: url('../images/browserid.png?1349294801');
-  background-repeat: no-repeat;
-  background-position: 50% 50%;
-  display: inline-block;
-  margin: 0 0.198em;
-  width: 79px;
-  vertical-align: top;
+input#id_openid_identifier {
+
+    width: 96%;
+    background-image: url('../images/openid-icon-100x100.png');
+    background-repeat: no-repeat;
+    background-position: 3%;
+    background-size: 7%;
+    padding-left: 2.4em;
+    font-weight: bold;
+    
 }
 
 #setusername {

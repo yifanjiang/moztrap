@@ -128,6 +128,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.admin",
     "django.contrib.humanize",
+    "django_openid_auth",
     "django_browserid",
     "south",
     "preferences",
@@ -242,3 +243,8 @@ SITE_URL = "http://localhost:8000"
 BROWSERID_CREATE_USER = "moztrap.model.core.auth.browserid_create_user"
 
 USE_BROWSERID = True
+
+# OPENID
+AUTHENTICATION_BACKENDS += ['moztrap.model.core.auth.OpenIDBackend']
+OPENID_CREATE_USERS = True
+OPENID_UPDATE_DETAILS_FROM_SREG = True

@@ -5,6 +5,7 @@ Proxy User and Role models.
 import base64
 import hashlib
 
+from django.conf import settings
 from django.db.models import Q
 
 from django.contrib.auth.backends import ModelBackend as DjangoModelBackend
@@ -16,9 +17,50 @@ from preferences import preferences
 from registration.models import RegistrationProfile
 from registration.signals import user_registered
 
+from django_openid_auth.auth import OpenIDBackend as BaseOpenIDBackend
 
 # monkeypatch the User model to ensure unique email addresses
 BaseUser._meta.get_field("email")._unique = True
+
+class OpenIDBackend(BaseOpenIDBackend):
+
+    # Use moztrap.model.core.auth.User instead of django.contrib.auth.models.User
+    def get_user(self, user_id):
+        try:
+            return User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return None
+
+
+    def filter_users_by_email(self, email):
+        """Return all users matching the specified email."""
+        return User.objects.filter(email=email)
+
+
+    def create_user_from_openid(self, openid_response):
+        details = self._extract_user_details(openid_response)
+        required_attrs = getattr(settings, 'OPENID_SREG_REQUIRED_FIELDS', [])
+        if getattr(settings, 'OPENID_STRICT_USERNAMES', False):
+            required_attrs.append('nickname')
+
+        for required_attr in required_attrs:
+            if required_attr not in details or not details[required_attr]:
+                raise RequiredAttributeNotReturned(
+                    "An attribute required for logging in was not "
+                    "returned ({0}).".format(required_attr))
+
+        email = details['email'] or ''
+
+        nickname = details['nickname'] or 'openiduser'
+        username = self._get_available_username(details['nickname'], openid_response.identity_url)
+        user = User.objects.create_user(username, email, password=None)
+
+        add_new_user_role(user)
+
+        self.associate_openid(user, openid_response)
+        self.update_user_details(user, details, openid_response)
+
+        return user
 
 
 class User(BaseUser):

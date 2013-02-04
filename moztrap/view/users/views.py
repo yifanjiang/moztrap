@@ -21,6 +21,7 @@ from session_csrf import anonymous_csrf
 from moztrap import model
 from . import forms
 
+from django_openid_auth.forms import OpenIDLoginForm
 
 
 class Verify(BaseVerify):
@@ -47,6 +48,7 @@ def login(request):
     kwargs = {
         "template_name": "users/login.html",
         "authentication_form": forms.CaptchaAuthenticationForm,
+        "extra_context": {"openid_login_form":OpenIDLoginForm},
         }
     if settings.USE_BROWSERID:
         kwargs["template_name"] = "users/browserid_login.html"

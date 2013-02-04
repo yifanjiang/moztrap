@@ -42,6 +42,9 @@ urlpatterns = patterns(
     # browserid --------------------------------------------------------------
     url(r"^browserid/", include("moztrap.view.users.browserid_urls")),
 
+    # openid --------------------------------------------------------------
+    url(r"^openid/", include("django_openid_auth.urls")),    
+
     # api --------------------------------------------------------------------
     url(r"^api/", include("moztrap.view.api.urls")),
 
