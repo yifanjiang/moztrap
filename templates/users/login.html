@@ -8,7 +8,7 @@
       <a href="{% url 'registration_register' %}">Register</a>
       |
       <a href="{% url 'auth_password_reset' %}">Reset password</a>
-    </p>  
+    </p>
     {% block login-content %}
 
       <form method="POST" id="loginform">
@@ -46,7 +46,7 @@
 
 
   </section>
-  
+
   <section id="openid_login" class="logintype-form">
 
       {% csrf_token %}
@@ -76,7 +76,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="assertion" id="id_assertion" />
                 <input type="hidden" name="next" id="id_next" value="{{ next|default:'/' }}" />
-              </form>              
+              </form>
 
             </td>
           </tr>
@@ -89,6 +89,6 @@
 
 
   </section>
-  
+
 
 {% endblock content %}
