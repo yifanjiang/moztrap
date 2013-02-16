@@ -1,8 +1,22 @@
 MozTrap
 =======
 
-This is the MozTrap test case management system.  It lives at
-https://github.com/mozilla/moztrap/.
+The upstream Moztrap is located at:
+
+https://github.com/mozilla/moztrap/
+
+This fork aims to provide code for Libreoffice manual test project,
+which is distributed and deployed with Libreoffice specific hacks and
+features based on a particular upstream branch. The running instance
+of Libreoffice Moztrap can be found:
+
+http://manual-test.libreoffice.org/
+
+The fork tries to make the deployment as similar as possible to the
+upstream project, though a bit of tuning for
+`moztrap/settings/local.py` is required. A working sample of the
+settings for a typical development environment is provided in the
+following section.
 
 
 Documentation
@@ -36,3 +50,37 @@ respectively.
 .. _moztrap-tests: https://github.com/mozilla/moztrap-tests
 .. _moztrap-reqs: https://github.com/mozilla/moztrap-reqs
 .. _moztrap-vendor-lib: https://github.com/mozilla/moztrap-vendor-lib
+
+sample local.py for lomoztrap
+-----------------------------
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": "db",
+            "USER": environ.get("USER", ""),
+            "PASSWORD": "",
+            "OPTIONS": {
+                "init_command": "SET storage_engine=InnoDB",
+                },
+            "STORAGE_ENGINE": "InnoDB"
+            }
+        }
+
+    USE_BROWSERID = False
+
+    HMAC_KEYS = {
+        "default": "override this"
+    }
+
+    BASE_PASSWORD_HASHERS = (
+        'django_sha2.hashers.BcryptHMACCombinedPasswordVerifier',
+        'django_sha2.hashers.SHA512PasswordHasher',
+        'django_sha2.hashers.SHA256PasswordHasher',
+        'django.contrib.auth.hashers.SHA1PasswordHasher',
+        'django.contrib.auth.hashers.MD5PasswordHasher',
+        'django.contrib.auth.hashers.UnsaltedMD5PasswordHasher'
+    )
+
+    from django_sha2 import get_password_hashers
+    PASSWORD_HASHERS = get_password_hashers(BASE_PASSWORD_HASHERS, HMAC_KEYS)
