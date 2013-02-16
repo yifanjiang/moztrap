@@ -51,8 +51,10 @@ respectively.
 .. _moztrap-reqs: https://github.com/mozilla/moztrap-reqs
 .. _moztrap-vendor-lib: https://github.com/mozilla/moztrap-vendor-lib
 
-sample local.py for lomoztrap
+Sample local.py for lomoztrap
 -----------------------------
+
+Sample::
 
     DATABASES = {
         "default": {
