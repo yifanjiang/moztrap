@@ -4,9 +4,9 @@ Models for test execution (runs, results).
 """
 import datetime
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db import connection, transaction, models
-from django.db.models import Q
+from django.db.models import Q, Count, Max
 
 from model_utils import Choices
 
@@ -133,6 +133,8 @@ class Run(MTModel, TeamModel, DraftStatusModel, HasEnvironmentsModel):
         run_env_ids = self.environments.values_list("id", flat=True)
 
         # make a list of cvs in order by RunSuite, then SuiteCase.
+        # This list is built from the run / suite / env combination and has
+        # no knowledge of any possibly existing runcaseversions yet.
         if len(run_env_ids):
             cursor = connection.cursor()
             sql = """SELECT DISTINCT cv.id as id
@@ -158,11 +160,33 @@ class Run(MTModel, TeamModel, DraftStatusModel, HasEnvironmentsModel):
             cursor.execute(sql)
 
             cv_list = [x[0] for x in cursor.fetchall()]
+
+            # @@@ do we need to check for duplicates?
+            # use itertools.unique_everseen
+            #if len(set(cv_list)) != len(cv_list):
+            #    cv_list = itertools.unique_everseen(cv_list)
+
         else:
             cv_list = []
 
         # delete rcvs that we won't be needing anymore
         self._delete_runcaseversions(cv_list)
+
+        # audit for duplicate rcvs for the same cv.id
+        dups = self.runcaseversions.values("caseversion_id").annotate(
+            num_records=Count("caseversion")).filter(num_records__gt=1)
+        if len(dups) > 0:
+            for dup in dups:
+                # get the runcaseversions, and sort descending by the id
+                # of the results.  So the first one is the one with the latest
+                # result.  We keep that one and delete the rest.
+                rcv_to_save = self.runcaseversions.annotate(
+                    latest_result=Max("results__id")).filter(
+                        caseversion=dup["caseversion_id"]).order_by(
+                            "-latest_result")[0]
+                self.runcaseversions.filter(
+                    caseversion=dup["caseversion_id"]).exclude(
+                        id=rcv_to_save.id).delete()
 
         # remaining rcvs should be ones we want to keep, and we need to inject
         # those ids into the insert/update list for bulk_insert.  So create
@@ -178,21 +202,31 @@ class Run(MTModel, TeamModel, DraftStatusModel, HasEnvironmentsModel):
         # an update on insert error.
 
         # runcaseversion objects we will use to bulk create
-        rcv_proxies = []
+        rcv_to_update = []
+        rcv_proxies_to_create = []
 
         order = 1
         for cv in cv_list:
-            kwargs = {"run_id": self.id, "caseversion_id": cv, "order": order}
-            try:
-                kwargs["id"] = existing_rcv_map[cv]
-            except KeyError:
-                # this caseversion had not been previously included in the run
-                pass
-            rcv_proxies.append(RunCaseVersion(**kwargs))
+            if cv in existing_rcv_map:
+                # we will just update the order value
+                rcv_to_update.append({"caseversion_id": cv, "order": order})
+            else:
+                # we need to create a new one
+                kwargs = {
+                    "run_id": self.id,
+                    "caseversion_id": cv,
+                    "order": order
+                    }
+                rcv_proxies_to_create.append(RunCaseVersion(**kwargs))
             order += 1
 
+        # update existing rcvs
+        for rcv in rcv_to_update:
+            self.runcaseversions.filter(
+                caseversion=rcv["caseversion_id"]).update(order=rcv["order"])
+
         # insert these rcvs in bulk
-        self._bulk_insert_new_runcaseversions(rcv_proxies)
+        self._bulk_insert_new_runcaseversions(rcv_proxies_to_create)
 
         self._bulk_update_runcaseversion_environments_for_lock()
 
@@ -207,7 +241,7 @@ class Run(MTModel, TeamModel, DraftStatusModel, HasEnvironmentsModel):
 
     def _bulk_insert_new_runcaseversions(self, rcv_proxies):
         """Hook to bulk-insert runcaseversions we know we DO need."""
-        RunCaseVersion.objects.bulk_insert_or_update(rcv_proxies)
+        self.runcaseversions.bulk_create(rcv_proxies)
 
 
     def _bulk_update_runcaseversion_environments_for_lock(self):
@@ -278,18 +312,53 @@ class Run(MTModel, TeamModel, DraftStatusModel, HasEnvironmentsModel):
 
 
     def completion(self):
-        """Return fraction of case/env combos that have a completed result."""
-        total = RunCaseVersion.environments.through._default_manager.filter(
-            runcaseversion__run=self).count()
+        """
+        Return fraction of case/env combos that have a completed result.
+
+        Have to specify deleted_on=None for the through, because the
+        default manager doesn't go through our MT model manager.
+        """
+        total = RunCaseVersion.environments.through.objects.filter(
+            runcaseversion__run=self,
+            runcaseversion__deleted_on=None,
+            ).count()
+        skipped = Result.objects.filter(
+            runcaseversion__run=self,
+            is_latest=True,
+            status=Result.STATUS.skipped).count()
         completed = Result.objects.filter(
             status__in=Result.COMPLETED_STATES,
+            is_latest=True,
             runcaseversion__run=self).values(
             "runcaseversion", "environment").distinct().count()
 
         try:
-            return float(completed) / total
+            return float(completed) / (total - skipped)
         except ZeroDivisionError:
             return 0
+
+
+    def completion_single_env(self, env_id):
+        """Return fraction of cases that have a completed result for an env."""
+        total = RunCaseVersion.objects.filter(
+            environments=env_id,
+            run=self).count()
+        skipped = Result.objects.filter(
+            runcaseversion__run=self,
+            environment=env_id,
+            is_latest=True,
+            status=Result.STATUS.skipped).count()
+        completed = Result.objects.filter(
+            status__in=Result.COMPLETED_STATES,
+            is_latest=True,
+            environment=env_id,
+            runcaseversion__run=self).values(
+            "runcaseversion", "environment").distinct().count()
+
+        try:
+            return float(completed) / (total - skipped)
+        except ZeroDivisionError:
+            return 0.0
 
 
 
@@ -359,18 +428,22 @@ class RunCaseVersion(HasEnvironmentsModel, MTModel):
 
     def result_summary(self):
         """Return a dict summarizing status of results."""
-        return result_summary(self.results.all())
+        return result_summary(self.results.values())
 
 
     def completion(self):
         """Return fraction of environments that have a completed result."""
         total = self.environments.count()
+        skipped = self.results.filter(
+            is_latest=True,
+            status=Result.STATUS.skipped).count()
         completed = self.results.filter(
+            is_latest=True,
             status__in=Result.COMPLETED_STATES).values(
             "environment").distinct().count()
 
         try:
-            return float(completed) / total
+            return float(completed) / (total - skipped)
         except ZeroDivisionError:
             return 0
 
@@ -383,13 +456,28 @@ class RunCaseVersion(HasEnvironmentsModel, MTModel):
 
     def start(self, environment=None, user=None):
         """Mark this result started."""
-        Result.objects.create(
-            runcaseversion=self,
-            tester=user,
-            environment=environment,
-            status=Result.STATUS.started,
-            user=user
-            )
+        # if we are restarted a case that was skipped, we want to restart
+        # for ALL envs, not just this one.
+        envs = [environment]
+        try:
+            latest = self.results.get(
+                is_latest=True,
+                tester=user,
+                environment=environment,
+                )
+            if latest.status == Result.STATUS.skipped:
+                envs = self.environments.all()
+        except ObjectDoesNotExist:
+            pass
+
+        for env in envs:
+            Result.objects.create(
+                runcaseversion=self,
+                tester=user,
+                environment=env,
+                status=Result.STATUS.started,
+                user=user
+                )
 
 
     def get_result_method(self, status):
@@ -398,6 +486,8 @@ class RunCaseVersion(HasEnvironmentsModel, MTModel):
             "passed": self.result_pass,
             "failed": self.result_fail,
             "invalidated": self.result_invalid,
+            "blocked": self.result_block,
+            "skipped": self.result_skip,
             }
 
         return status_methods[status]
@@ -415,6 +505,24 @@ class RunCaseVersion(HasEnvironmentsModel, MTModel):
         )
 
 
+    def result_skip(self, environment=None, user=None):
+        """
+        Create a skipped result for this case.
+
+        If no environment is specified, then skip for all envs.
+        """
+        envs = self.environments.all()
+
+        for env in envs:
+            Result.objects.create(
+                runcaseversion=self,
+                tester=user,
+                environment=env,
+                status=Result.STATUS.skipped,
+                user=user
+            )
+
+
     def result_invalid(self, environment=None, comment="", user=None):
         """Create an invalidated result for this case."""
         Result.objects.create(
@@ -422,6 +530,18 @@ class RunCaseVersion(HasEnvironmentsModel, MTModel):
             tester=user,
             environment=environment,
             status=Result.STATUS.invalidated,
+            comment=comment,
+            user=user,
+        )
+
+
+    def result_block(self, environment=None, comment="", user=None):
+        """Create an invalidated result for this case."""
+        Result.objects.create(
+            runcaseversion=self,
+            tester=user,
+            environment=environment,
+            status=Result.STATUS.blocked,
             comment=comment,
             user=user,
         )
@@ -457,7 +577,7 @@ class RunSuite(MTModel):
     An ordered association between a Run and a Suite.
 
     The only direct impact of RunSuite instances is that they determine which
-    RunCaseVersions are created when the run is activated.
+    RunCaseVersions (and in what order) are created when the run is activated.
 
     """
     run = models.ForeignKey(Run, related_name="runsuites")
@@ -477,10 +597,15 @@ class RunSuite(MTModel):
 
 class Result(MTModel):
     """A result of a User running a RunCaseVersion in an Environment."""
-    STATUS = Choices("assigned", "started", "passed", "failed", "invalidated")
+    STATUS = Choices("assigned", "started", "passed", "failed", "invalidated",
+                     "blocked", "skipped")
     REVIEW = Choices("pending", "reviewed")
 
-    COMPLETED_STATES = [STATUS.passed, STATUS.failed, STATUS.invalidated]
+    ALL_STATES = STATUS._full
+    PENDING_STATES = [STATUS.assigned, STATUS.started]
+    COMPLETED_STATES = [STATUS.passed, STATUS.failed, STATUS.invalidated,
+                        STATUS.blocked]
+    FAILED_STATES = [STATUS.failed, STATUS.blocked]
 
     tester = models.ForeignKey(User, related_name="results")
     runcaseversion = models.ForeignKey(
@@ -540,13 +665,13 @@ class Result(MTModel):
 
 class StepResult(MTModel):
     """A result of a particular step in a test case."""
-    STATUS = Choices("passed", "failed", "invalidated")
+    STATUS = Choices("passed", "failed", "invalidated", "skipped", "blocked")
 
     result = models.ForeignKey(Result, related_name="stepresults")
     step = models.ForeignKey(CaseStep, related_name="stepresults")
     status = models.CharField(
         max_length=50, db_index=True, choices=STATUS, default=STATUS.passed)
-    bug_url = models.URLField(blank=True)
+    bug_url = models.URLField(db_index=True, blank=True)
 
 
     def __unicode__(self):

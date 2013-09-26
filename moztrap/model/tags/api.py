@@ -25,7 +25,7 @@ class TagResource(MTResource):
     #@@@ additional relationship caseversions needs to be handled
 
     class Meta(MTResource.Meta):
-        queryset = Tag.objects.all()
+        queryset = Tag.objects.all().select_related("product")
         fields = ["id", "name", "description", "product"]
         filtering = {
             "name": ALL,
@@ -38,6 +38,9 @@ class TagResource(MTResource):
         """Model class related to this resource."""
         return Tag
 
+
+    # do not put read_create_fields here, as product is a special
+    # case that may be changed some times but not others
 
     def obj_update(self, bundle, request=None, **kwargs):
         """Lots of rules for modifying product for tags."""

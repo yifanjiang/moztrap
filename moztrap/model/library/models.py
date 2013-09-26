@@ -17,6 +17,7 @@ class Case(MTModel):
     """A test case for a given product."""
     product = models.ForeignKey(Product, related_name="cases")
     idprefix = models.CharField(max_length=25, blank=True)
+    priority = models.IntegerField(blank=True, null=True)
 
 
     def __unicode__(self):
@@ -115,9 +116,21 @@ class CaseVersion(MTModel, DraftStatusModel, HasEnvironmentsModel):
     def save(self, *args, **kwargs):
         """Save CaseVersion, updating latest version."""
         skip_set_latest = kwargs.pop("skip_set_latest", False)
+        skip_sync_name = kwargs.pop("skip_sync_name", False)
         super(CaseVersion, self).save(*args, **kwargs)
         if not skip_set_latest:
             self.case.set_latest_version(update_instance=self)
+
+        # keep the name in sync for all caseversions
+        if not skip_sync_name:
+            for cv in self.case.versions.all():
+                if not cv == self:
+                    cv.name = self.name
+                    cv.save(
+                        skip_sync_name=True,
+                        skip_set_latest=True,
+                        )
+
 
 
     def delete(self, *args, **kwargs):
@@ -213,9 +226,13 @@ class CaseVersion(MTModel, DraftStatusModel, HasEnvironmentsModel):
         Result = self.runcaseversions.model.results.related.model
         StepResult = Result.stepresults.related.model
         return set(
-            StepResult.objects.filter(
-                result__runcaseversion__caseversion=self).exclude(
-                bug_url="").values_list("bug_url", flat=True).distinct()
+            StepResult.objects.only(
+                "bug_url",
+                "deleted_on",
+                "result_id",
+                ).filter(
+                    result__runcaseversion__caseversion=self).exclude(
+                        bug_url="").values_list("bug_url", flat=True).distinct()
             )
 
 
@@ -271,7 +288,7 @@ class Suite(MTModel, DraftStatusModel):
     DEFAULT_STATUS = DraftStatusModel.STATUS.active
 
     product = models.ForeignKey(Product, related_name="suites")
-    name = models.CharField(max_length=200)
+    name = models.CharField(db_index=True, max_length=200)
     description = models.TextField(blank=True)
 
     cases = models.ManyToManyField(

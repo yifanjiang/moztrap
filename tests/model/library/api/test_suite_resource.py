@@ -94,6 +94,11 @@ class SuiteResourceTest(ApiCrudCases):
         return actual
 
 
+    @property
+    def read_create_fields(self):
+        """List of fields that are required for create but read-only for update."""
+        return ["product"]
+
     # additional test cases, if any
 
 
@@ -121,7 +126,7 @@ class SuiteSelectionResourceTest(case.api.ApiTestCase):
         return "{0}__ne".format(self.included_param)
 
 
-    def get_exp_obj(self, s, runs=[], order=None):
+    def get_exp_obj(self, s, runs=[]):
         """Return an expected suiteselection object with fields filled."""
 
         return {
@@ -132,7 +137,6 @@ class SuiteSelectionResourceTest(case.api.ApiTestCase):
             u"id": unicode(s.id),
             u"name": unicode(s.name),
             u"runs": runs,
-            u"order": order,
             u"product": unicode(
                 self.get_detail_url("product", s.product.id)),
             u"resource_uri": unicode(
@@ -214,7 +218,6 @@ class SuiteSelectionResourceTest(case.api.ApiTestCase):
         exp_objects = [self.get_exp_obj(
             s,
             [unicode(self.get_detail_url("run", data["run"].id))],
-            rs.order,
             ) for s, rs in [
                 (data["s1"], data["runsuite1"]),
                 (data["s2"], data["runsuite2"])]]
@@ -260,11 +263,39 @@ class SuiteSelectionResourceTest(case.api.ApiTestCase):
         exp_objects = [self.get_exp_obj(
             data["s1"],
             [unicode(self.get_detail_url("run", data["run"].id))],
-            data["runsuite1"].order,
             )]
 
         self._do_test(
             data["run"].id,
             self.included_param,
             exp_objects=exp_objects,
+            )
+
+
+    def test_available_included_in_other_runs(self):
+        """Get a list of available suites, when suites included elsewhere"""
+
+        s1 = self.factory.create(name="Suite1")
+        s2 = self.factory.create(name="Suite2")
+        run1 = self.F.RunFactory.create()
+        runsuite1 = self.F.RunSuiteFactory.create(
+            run=run1, suite=s1, order=0)
+        runsuite2 = self.F.RunSuiteFactory.create(
+            run=run1, suite=s2, order=1)
+        run2 = self.F.RunFactory.create()
+        runsuite3 = self.F.RunSuiteFactory.create(
+            run=run2, suite=s1, order=0)
+        runsuite4 = self.F.RunSuiteFactory.create(
+            run=run2, suite=s2, order=1)
+
+        self._do_test(
+            -1,
+            self.available_param,
+            [self.get_exp_obj(
+                s,
+                runs=[
+                    unicode(self.get_detail_url("run", run1.id)),
+                    unicode(self.get_detail_url("run", run2.id)),
+                    ],
+                ) for s, rs in [(s1, runsuite3), (s2, runsuite4)]],
             )

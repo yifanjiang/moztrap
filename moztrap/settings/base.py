@@ -14,7 +14,7 @@ DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = [
-    ("Carl Meyer", "cmeyer@mozilla.com"),
+    ("Some One", "someone@mozilla.com"),
 ]
 
 MANAGERS = ADMINS
@@ -26,7 +26,7 @@ DATABASES = {
         "USER": environ.get("USER", ""),
         "PASSWORD": "",
         "OPTIONS": {
-            "init_command": "SET storage_engine=InnoDB",
+            "init_command": "SET default_storage_engine=InnoDB",
             },
         "STORAGE_ENGINE": "InnoDB"
         }

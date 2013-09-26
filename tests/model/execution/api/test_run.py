@@ -96,26 +96,18 @@ class RunResourceTest(case.api.ApiTestCase):
 
         exp_objects = {
             u'elements': [
-                {u'category':
-                     {u'resource_uri': unicode(self.get_detail_url(
-                         "category",
-                         envs[0].elements.get().category.id),
-                        ),
-                      u'id': unicode(envs[0].elements.get().category.id),
-                      u'name': u'OS'
-                     },
-                 u'resource_uri': unicode(self.get_detail_url(
+                 unicode(self.get_detail_url(
                      "element",
                      envs[0].elements.get().id),
-                 ),
-                 u'id': unicode(envs[0].elements.get().id),
-                 u'name': u'OS X'
-                }],
+                 )],
             u'id': unicode(envs[0].id),
+            u'profile': unicode(self.get_detail_url(
+                "profile", envs[0].profile.id
+            )),
             u'resource_uri': unicode(self.get_detail_url(
                 "environment",
                 envs[0].id),
-                )
+                ),
             }
 
         self.assertEqual(unicode(r.name), res.json["name"], res.json)
@@ -140,6 +132,14 @@ class RunResourceTest(case.api.ApiTestCase):
             case__product=pv.product,
             productversion=pv,
             )
+        c_b = self.F.CaseVersionFactory.create(
+            case__product=pv.product,
+            productversion=pv,
+            )
+        c_s = self.F.CaseVersionFactory.create(
+            case__product=pv.product,
+            productversion=pv,
+            )
         self.F.CaseStepFactory(caseversion=c_f)
 
         # submit results for these cases
@@ -156,10 +156,19 @@ class RunResourceTest(case.api.ApiTestCase):
                      "environment": unicode(envs[0].id),
                      "status": "invalidated",
                      },
+                    {"case": unicode(c_b.case.id),
+                     "comment": "no can do",
+                     "environment": unicode(envs[0].id),
+                     "status": "blocked",
+                     },
                     {"case": unicode(c_p.case.id),
                      "environment": unicode(envs[0].id),
                      "status": "passed"
-                },
+                    },
+                    {"case": unicode(c_s.case.id),
+                     "environment": unicode(envs[0].id),
+                     "status": "skipped"
+                    },
                     {"bug": "http://www.deathvalleydogs.com",
                      "case": unicode(c_f.case.id),
                      "comment": "dang thing...",
