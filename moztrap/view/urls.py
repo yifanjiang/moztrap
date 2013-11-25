@@ -12,11 +12,8 @@ from moztrap.model import mtadmin
 
 
 
-# admin.site = mtadmin.MTAdminSite()
+admin.site = mtadmin.MTAdminSite()
 admin.autodiscover()
-
-print admin.site._registry
-
 
 import session_csrf
 session_csrf.monkeypatch()
