@@ -5,10 +5,10 @@ The upstream Moztrap is located at:
 
 https://github.com/mozilla/moztrap/
 
-This fork aims to provide code for Libreoffice manual test project,
-which is distributed and deployed with Libreoffice specific hacks and
+This fork aims to provide code for LibreOffice manual test project,
+which is distributed and deployed with LibreOffice specific hacks and
 features based on a particular upstream branch. The running instance
-of Libreoffice Moztrap can be found:
+of LibreOffice Moztrap can be found:
 
 http://manual-test.libreoffice.org/
 
